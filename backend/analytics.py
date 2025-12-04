@@ -37,8 +37,6 @@ print("Device:", device)
 _hinder_counters = {
     "frozen": 0,
     "covered": 0,
-    "low_contrast": 0,
-    "obstructed": 0
 }
 FROZEN_DIFF_THRESH = 2.0
 FROZEN_FRAMES_THRESH = 5
@@ -46,8 +44,6 @@ COVERED_MEAN_THRESH = 15
 COVERED_FRAMES_THRESH = 3
 LOW_CONTRAST_STD_THRESH = 10.0
 LOW_CONTRAST_FRAMES_THRESH = 5
-OBSTRUCT_EDGE_DENSITY_THRESH = 0.005
-OBSTRUCT_FRAMES_THRESH = 5
 DARK_PCT_THRESH = 0.50
 
 _prev_gray_for_hinder = None
@@ -70,8 +66,6 @@ def check_camera_hinder(frame_bgr):  # EXACT COPY FROM WORKING VERSION
         diff_mean = float(diff.mean())
 
     edges = cv2.Canny(gray, 50, 150)
-    edge_density = float(np.mean(edges > 0))
-    dark_pct = float(np.mean(gray < 30))
 
     if diff_mean < FROZEN_DIFF_THRESH:
         _hinder_counters["frozen"] += 1
@@ -83,25 +77,11 @@ def check_camera_hinder(frame_bgr):  # EXACT COPY FROM WORKING VERSION
     else:
         _hinder_counters["covered"] = 0
 
-    if std < LOW_CONTRAST_STD_THRESH:
-        _hinder_counters["low_contrast"] += 1
-    else:
-        _hinder_counters["low_contrast"] = 0
-
-    if edge_density < OBSTRUCT_EDGE_DENSITY_THRESH or dark_pct >= DARK_PCT_THRESH:
-        _hinder_counters["obstructed"] += 1
-    else:
-        _hinder_counters["obstructed"] = 0
-
     reason = ""
     if _hinder_counters["frozen"] >= FROZEN_FRAMES_THRESH:
         reason = "camera_frozen"
     elif _hinder_counters["covered"] >= COVERED_FRAMES_THRESH:
         reason = "lens_covered_or_extremely_dark"
-    elif _hinder_counters["obstructed"] >= OBSTRUCT_FRAMES_THRESH:
-        reason = "obstructed_or_low_edge_density"
-    elif _hinder_counters["low_contrast"] >= LOW_CONTRAST_FRAMES_THRESH:
-        reason = "low_contrast"
 
     _prev_gray_for_hinder = gray.copy()
     return (bool(reason), reason)
