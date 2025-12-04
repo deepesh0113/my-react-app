@@ -29,52 +29,6 @@ function MainPage({ user }) {
   const width = useWindowWidth();
   const isMobile = width < 700;
 
-  const sampleCsvText = `
-Date,Timestamp_ns,Frame_index,Count,Alert
-2025-03-01,00:00:000,0,150.114
-2025-03-01,00:00:400,10,138.108
-2025-03-01,00:00:800,20,160.500
-2025-03-01,00:01:200,30,149.882
-2025-03-01,00:01:600,40,152.774
-2025-03-01,00:02:000,50,141.339
-2025-03-01,00:02:400,60,159.002
-2025-03-01,00:02:800,70,147.661
-2025-03-01,00:03:200,80,153.441
-2025-03-01,00:03:600,90,148.997,lens_covered_or_extremely_dark
-2025-03-01,00:04:000,100,157.884,lens_covered_or_extremely_dark
-2025-03-01,00:04:400,110,142.660,lens_covered_or_extremely_dark
-2025-03-01,00:04:800,120,151.225
-2025-03-01,00:05:200,130,158.331,camera_frozen
-2025-03-01,00:05:600,140,144.880,camera_frozen
-2025-03-01,00:06:000,150,156.102
-2025-03-01,00:06:400,160,139.556
-2025-03-01,00:06:800,170,153.774
-2025-03-01,00:07:200,180,157.330
-2025-03-01,00:07:600,190,143.901
-2025-03-01,00:08:000,200,159.447
-`.trim();
-
-  const sampleCsvLines = sampleCsvText.split("\n");
-  const [sampleCsvIndex, setSampleCsvIndex] = useState(1);
-  const [sampleCsvDisplay, setSampleCsvDisplay] = useState([sampleCsvLines[0]]);
-
-  // Simulate sample CSV streaming (for pairId 0 right side)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSampleCsvDisplay((prev) => {
-        if (sampleCsvIndex >= sampleCsvLines.length) {
-          setSampleCsvIndex(1);
-          return [sampleCsvLines[0]];
-        }
-        const nextLine = sampleCsvLines[sampleCsvIndex];
-        setSampleCsvIndex((i) => i + 1);
-        return [...prev, nextLine];
-      });
-    }, 400);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sampleCsvIndex]);
-
   // Clear polling timers on unmount
   useEffect(() => {
     return () => {
@@ -351,20 +305,6 @@ Date,Timestamp_ns,Frame_index,Count,Alert
     {
       pairId: 0,
       cameras: [
-        {
-          id: 0,
-          name: "Camera 0 - Sample Video",
-          src: "/people.mp4",
-          on: true,
-          uploadedFile: null,
-        },
-        {
-          id: 1,
-          name: "Camera 0b - Sample Output",
-          src: "/output_with_heatmap.gif",
-          on: true,
-          uploadedFile: null,
-        },
       ],
     },
   ]);
@@ -728,9 +668,6 @@ Date,Timestamp_ns,Frame_index,Count,Alert
                               <div style={styles.csvTitle}>
                                 Sample Crowd CSV (simulated live)
                               </div>
-                              <pre style={styles.csvContent}>
-                                {sampleCsvDisplay.join("\n")}
-                              </pre>
                             </div>
                           ) : (
                             <div style={styles.csvBox}>
@@ -862,7 +799,7 @@ Date,Timestamp_ns,Frame_index,Count,Alert
       </div>
 
       <button style={styles.addCameraBtn} onClick={addCameraPair}>
-        + Add More Camera Pair
+        + Add Camera Pair
       </button>
 
       <div style={styles.buttonRow}>
