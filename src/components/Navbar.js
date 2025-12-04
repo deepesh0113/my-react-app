@@ -34,6 +34,7 @@ function Navbar() {
       <div className={`navbar-links${menuOpen ? " open" : ""}`}>
         <Link to="/" onClick={handleLinkClick}>Home</Link>
         <Link to="/main_page" onClick={handleLinkClick}>Analysis</Link>
+        {/* <Link to="/dashboard" onClick={handleLinkClick}>Dashboard</Link> */}
         <Link to="/crowd_count_photo" onClick={handleLinkClick}>CCPhoto</Link>
         <Link to="/reports" onClick={handleLinkClick}>Reports</Link>
         <Link to="/contact" onClick={handleLinkClick}>Contact</Link>

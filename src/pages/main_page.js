@@ -14,26 +14,71 @@ function useWindowWidth() {
 function MainPage({ user }) {
   const navigate = useNavigate();
 
-  const [alertOpen, setAlertOpen] = useState(false);
   const [systemSettingsOpen, setSystemSettingsOpen] = useState(false);
-
-  const alertRef = useRef(null);
   const systemSettingsRef = useRef(null);
-
-  const [selectedSound, setSelectedSound] = useState("sound1");
-  const [volume, setVolume] = useState(50);
 
   const [selectedSystemCamera, setSelectedSystemCamera] = useState("");
   const [uploadedVideoURL, setUploadedVideoURL] = useState(null);
 
+  // map: pairId -> crowd_txt content
+  const [crowdTxtMap, setCrowdTxtMap] = useState({});
+
   const width = useWindowWidth();
   const isMobile = width < 700;
 
-  const audioRef = useRef(null);
+
+  // --- SAMPLE CSV STREAM (for sample right side) ---
+  const sampleCsvText = `
+Date,Timestamp_ns,Frame_index,Count
+2025-03-01,00:00:000,0,150.114
+2025-03-01,00:00:400,10,138.108
+2025-03-01,00:00:800,20,160.500
+2025-03-01,00:01:200,30,149.882
+2025-03-01,00:01:600,40,152.774
+2025-03-01,00:02:000,50,141.339
+2025-03-01,00:02:400,60,159.002
+2025-03-01,00:02:800,70,147.661
+2025-03-01,00:03:200,80,153.441
+2025-03-01,00:03:600,90,148.997
+2025-03-01,00:04:000,100,157.884
+2025-03-01,00:04:400,110,142.660
+2025-03-01,00:04:800,120,151.225
+2025-03-01,00:05:200,130,158.331
+2025-03-01,00:05:600,140,144.880
+2025-03-01,00:06:000,150,156.102
+2025-03-01,00:06:400,160,139.556
+2025-03-01,00:06:800,170,153.774
+2025-03-01,00:07:200,180,157.330
+2025-03-01,00:07:600,190,143.901
+2025-03-01,00:08:000,200,159.447
+`.trim();
+
+  const sampleCsvLines = sampleCsvText.split("\n");
+  const [sampleCsvIndex, setSampleCsvIndex] = useState(1); // start after header
+  const [sampleCsvDisplay, setSampleCsvDisplay] = useState([sampleCsvLines[0]]);
+
+  // simulate real-time CSV writing for sample right pane
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSampleCsvDisplay((prev) => {
+        // When we reach end, reset to only header again
+        if (sampleCsvIndex >= sampleCsvLines.length) {
+          setSampleCsvIndex(1);
+          return [sampleCsvLines[0]];
+        }
+        // otherwise append next line
+        const nextLine = sampleCsvLines[sampleCsvIndex];
+        setSampleCsvIndex((i) => i + 1);
+        return [...prev, nextLine];
+      });
+    }, 400); // every 400ms, adjust speed if you like
+
+    return () => clearInterval(interval);
+  }, [sampleCsvLines.length, sampleCsvIndex]);
 
   const styles = {
     page: {
-      backgroundColor: "#020617", // serious dark
+      backgroundColor: "#020617",
       minHeight: "100vh",
       padding: isMobile ? "18px 4vw" : "32px 56px",
       fontFamily:
@@ -47,7 +92,6 @@ function MainPage({ user }) {
       boxSizing: "border-box",
     },
 
-    // TOP WELCOME ROW (no role/account)
     welcomeRow: {
       display: "flex",
       flexDirection: isMobile ? "column" : "row",
@@ -131,6 +175,8 @@ function MainPage({ user }) {
       position: "relative",
       marginTop: 8,
       marginBottom: 10,
+      padding: 8,
+      boxSizing: "border-box",
     },
     cameraVideo: {
       width: "100%",
@@ -138,6 +184,34 @@ function MainPage({ user }) {
       objectFit: "contain",
       borderRadius: "14px",
       backgroundColor: "#000",
+    },
+
+    // CSV view on right side (non-sample model card)
+    csvBox: {
+      width: "100%",
+      height: "100%",
+      borderRadius: 12,
+      border: "1px solid #1f2937",
+      backgroundColor: "#020617",
+      padding: 10,
+      boxSizing: "border-box",
+      display: "flex",
+      flexDirection: "column",
+    },
+    csvTitle: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#93c5fd",
+      marginBottom: 6,
+    },
+    csvContent: {
+      flex: 1,
+      fontSize: 11,
+      lineHeight: 1.4,
+      color: "#e5e7eb",
+      whiteSpace: "pre-wrap",
+      overflowY: "auto",
+      paddingRight: 4,
     },
 
     cameraSettings: {
@@ -156,12 +230,6 @@ function MainPage({ user }) {
       fontWeight: 500,
       fontSize: isMobile ? 13 : 14,
       color: "#e5e7eb",
-    },
-    volumeDisplay: {
-      fontWeight: 600,
-      marginLeft: isMobile ? 6 : 10,
-      color: "#93baff",
-      fontSize: 13,
     },
 
     deleteCameraBtn: {
@@ -215,7 +283,7 @@ function MainPage({ user }) {
       alignSelf: "center",
     },
 
-    alertPanel: {
+    sidePanel: {
       position: isMobile ? "static" : "fixed",
       top: isMobile ? undefined : 96,
       right: isMobile ? undefined : 28,
@@ -231,21 +299,12 @@ function MainPage({ user }) {
       boxSizing: "border-box",
       marginTop: isMobile ? 16 : 0,
     },
-    alertTitle: {
+    sidePanelTitle: {
       fontWeight: 600,
       fontSize: isMobile ? 15 : 17,
       marginBottom: 10,
       color: "#93c5fd",
     },
-    volumeInput: {
-      width: "100%",
-      height: 6,
-      borderRadius: 4,
-      background: "#020617",
-      cursor: "pointer",
-      marginTop: 4,
-    },
-
     closeBtn: {
       marginTop: 10,
       width: "100%",
@@ -291,24 +350,20 @@ function MainPage({ user }) {
 
   const [cameraPairs, setCameraPairs] = useState([
     {
-      pairId: 0, // base cameras - locked from delete
+      pairId: 0, // base sample cameras (do not touch)
       cameras: [
         {
           id: 0,
           name: "Camera 0 - Sample Video",
           src: "/people.mp4",
           on: true,
-          alertSound: "sound1",
-          volume: 50,
           uploadedFile: null,
         },
         {
           id: 1,
-          name: "Camera 0b - Output Video",
+          name: "Camera 0b - Sample Output",
           src: "/output_with_heatmap.gif",
           on: true,
-          alertSound: "sound1",
-          volume: 50,
           uploadedFile: null,
         },
       ],
@@ -324,9 +379,6 @@ function MainPage({ user }) {
 
   useEffect(() => {
     function handleClickOutside(event) {
-      if (alertRef.current && !alertRef.current.contains(event.target) && alertOpen) {
-        setAlertOpen(false);
-      }
       if (
         systemSettingsRef.current &&
         !systemSettingsRef.current.contains(event.target) &&
@@ -337,36 +389,21 @@ function MainPage({ user }) {
     }
 
     document.addEventListener("mousedown", handleClickOutside);
-
-    // play / stop global alert preview
-    if (alertOpen && audioRef.current) {
-      audioRef.current.src = `/sounds/${selectedSound}.mp3`;
-      audioRef.current.volume = volume / 100;
-      audioRef.current.loop = true;
-      audioRef.current.load();
-      audioRef.current.play().catch((e) => {
-        console.log("Alert sound play prevented:", e);
-      });
-    } else if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [alertOpen, systemSettingsOpen, selectedSound, volume]);
+  }, [systemSettingsOpen]);
 
   const toggleCamera = (pairId, cameraId) => {
     setCameraPairs((pairs) =>
       pairs.map((pair) =>
         pair.pairId === pairId
           ? {
-              ...pair,
-              cameras: pair.cameras.map((cam) =>
-                cam.id === cameraId ? { ...cam, on: !cam.on } : cam
-              ),
-            }
+            ...pair,
+            cameras: pair.cameras.map((cam) =>
+              cam.id === cameraId ? { ...cam, on: !cam.on } : cam
+            ),
+          }
           : pair
       )
     );
@@ -377,103 +414,62 @@ function MainPage({ user }) {
       pairs.map((pair) =>
         pair.pairId === pairId
           ? {
-              ...pair,
-              cameras: pair.cameras.map((cam) =>
-                cam.id === cameraId ? { ...cam, name: newName } : cam
-              ),
-            }
+            ...pair,
+            cameras: pair.cameras.map((cam) =>
+              cam.id === cameraId ? { ...cam, name: newName } : cam
+            ),
+          }
           : pair
       )
     );
   };
 
-  const setCameraAlertSound = (pairId, cameraId, sound) => {
-    setCameraPairs((pairs) =>
-      pairs.map((pair) =>
-        pair.pairId === pairId
-          ? {
-              ...pair,
-              cameras: pair.cameras.map((cam) =>
-                cam.id === cameraId ? { ...cam, alertSound: sound } : cam
-              ),
-            }
-          : pair
-      )
-    );
-    playSound(sound);
-  };
-
-  const changeVolume = (pairId, cameraId, vol) => {
-    setCameraPairs((pairs) =>
-      pairs.map((pair) =>
-        pair.pairId === pairId
-          ? {
-              ...pair,
-              cameras: pair.cameras.map((cam) =>
-                cam.id === cameraId ? { ...cam, volume: vol } : cam
-              ),
-            }
-          : pair
-      )
-    );
-  };
-
+  // Upload video for REAL camera (left) => backend processes, we show CSV on right
   const uploadVideoFile = async (pairId, cameraId, file) => {
     const formData = new FormData();
     formData.append("video", file);
 
-    // fixed double http:// bug
-    const res = await fetch("http://0.0.0.0:8000/process_video/", {
-      method: "POST",
-      body: formData,
-    });
+    try {
+      const res = await fetch("http://0.0.0.0:8000/process_video/", {
+        method: "POST",
+        body: formData,
+      });
 
-    const data = await res.json();
+      // even if backend returns output_video, we ignore it for non-sample
+      await res.json().catch(() => null);
 
-    setCameraPairs((pairs) =>
-      pairs.map((pair) =>
-        pair.pairId === pairId
-          ? {
+      // Left side (real) shows uploaded video as before
+      setCameraPairs((pairs) =>
+        pairs.map((pair) =>
+          pair.pairId === pairId
+            ? {
               ...pair,
               cameras: pair.cameras.map((cam) =>
                 cam.id === cameraId
-                  ? { ...cam, src: URL.createObjectURL(file), uploadedFile: file }
-                  : cam.id === cameraId + 1
                   ? {
-                      ...cam,
-                      src: `http://0.0.0.0:8000/download_output?path=${encodeURIComponent(
-                        data.output_video
-                      )}`,
-                    }
+                    ...cam,
+                    src: URL.createObjectURL(file),
+                    uploadedFile: file,
+                  }
                   : cam
               ),
             }
-          : pair
-      )
-    );
+            : pair
+        )
+      );
 
-    fetch("http://0.0.0.0:8000/crowd_txt/")
-      .then((res) => res.text())
-      .then((txt) => {
-        // you can store & show this txt somewhere if needed
-      })
-      .catch(() => {});
-  };
-
-  const playSound = (sound) => {
-    if (audioRef.current) {
-      audioRef.current.src = `/sounds/${sound}.mp3`;
-      audioRef.current.load();
-      audioRef.current.volume = 1;
-      audioRef.current.play().catch((e) => {
-        console.log("Audio playback failed:", e);
-      });
-      setTimeout(() => {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-        }
-      }, 3000);
+      // Right side (model) shows live crowd_txt CSV
+      fetch("http://0.0.0.0:8000/crowd_txt/")
+        .then((r) => r.text())
+        .then((txt) => {
+          setCrowdTxtMap((prev) => ({
+            ...prev,
+            [pairId]: txt,
+          }));
+        })
+        .catch(() => { });
+    } catch (err) {
+      console.error("Error processing video:", err);
     }
   };
 
@@ -496,17 +492,13 @@ function MainPage({ user }) {
             name: `Camera ${newPairId} - Real`,
             src: "https://placeimg.com/640/480/nature",
             on: true,
-            alertSound: false,
-            volume: 50,
             uploadedFile: null,
           },
           {
             id: baseCamId + 2,
-            name: `Camera ${newPairId}b - Model Video`,
-            src: "https://placeimg.com/640/480/tech",
+            name: `Camera ${newPairId}b - Crowd CSV`,
+            src: "",
             on: true,
-            alertSound: false,
-            volume: 50,
             uploadedFile: null,
           },
         ],
@@ -515,8 +507,13 @@ function MainPage({ user }) {
   };
 
   const deleteCameraPair = (pairId) => {
-    if (pairId === 0) return;
+    if (pairId === 0) return; // don't delete sample pair
     setCameraPairs((pairs) => pairs.filter((pair) => pair.pairId !== pairId));
+    setCrowdTxtMap((prev) => {
+      const copy = { ...prev };
+      delete copy[pairId];
+      return copy;
+    });
   };
 
   const addSystemCamera = () => {
@@ -538,8 +535,8 @@ function MainPage({ user }) {
           },
           {
             id: newPairId * 2,
-            name: `${selectedSystemCamera} - Model Video`,
-            src: "https://placeimg.com/640/480/arch",
+            name: `${selectedSystemCamera}b - Crowd CSV`,
+            src: "",
             on: true,
           },
         ],
@@ -568,8 +565,8 @@ function MainPage({ user }) {
           },
           {
             id: newPairId * 2,
-            name: `Uploaded Video ${newPairId}b - Model Video`,
-            src: uploadedVideoURL,
+            name: `Uploaded Video ${newPairId}b - Crowd CSV`,
+            src: "",
             on: true,
           },
         ],
@@ -581,7 +578,7 @@ function MainPage({ user }) {
 
   return (
     <div style={styles.page}>
-      {/* Top: welcome, no role/account */}
+      {/* Top: welcome */}
       <div style={styles.welcomeRow}>
         <div>
           <div style={styles.brandTitle}>VigilNet</div>
@@ -618,24 +615,46 @@ function MainPage({ user }) {
 
                     <div style={styles.cameraFrame}>
                       {cam.on ? (
-                        <>
-                          {cam.src.endsWith(".mp4") ||
-                          cam.src.endsWith(".webm") ? (
-                            <video
-                              autoPlay
-                              muted
-                              loop
-                              style={styles.cameraVideo}
-                              src={cam.src}
-                            />
+                        // RIGHT card logic
+                        isModelVideo ? (
+                          // SAMPLE pair (pairId 0): show simulated CSV stream
+                          isCamera0 ? (
+                            <div style={styles.csvBox}>
+                              <div style={styles.csvTitle}>Sample Crowd CSV (simulated live)</div>
+                              <pre style={styles.csvContent}>
+                                {sampleCsvDisplay.join("\n")}
+                              </pre>
+                            </div>
                           ) : (
-                            <img
-                              style={styles.cameraVideo}
-                              alt={`${cam.name} Feed`}
-                              src={cam.src}
-                            />
-                          )}
-                        </>
+                            // NON-SAMPLE pair right side: backend crowd_txt
+                            <div style={styles.csvBox}>
+                              <div style={styles.csvTitle}>Crowd CSV (live)</div>
+                              <pre style={styles.csvContent}>
+                                {crowdTxtMap[pair.pairId] ||
+                                  "Upload a video on the left to stream crowd.csv from backend."}
+                              </pre>
+                            </div>
+                          )
+                        ) : (
+                          // LEFT (real) camera: normal video/image feed
+                          <>
+                            {cam.src.endsWith(".mp4") || cam.src.endsWith(".webm") ? (
+                              <video
+                                autoPlay
+                                muted
+                                loop
+                                style={styles.cameraVideo}
+                                src={cam.src}
+                              />
+                            ) : (
+                              <img
+                                style={styles.cameraVideo}
+                                alt={`${cam.name} Feed`}
+                                src={cam.src}
+                              />
+                            )}
+                          </>
+                        )
                       ) : (
                         <div
                           style={{
@@ -649,6 +668,7 @@ function MainPage({ user }) {
                       )}
                     </div>
 
+
                     <div style={styles.toggleSwitch}>
                       <label style={styles.toggleLabel}>{cam.name} On/Off</label>
                       <input
@@ -658,55 +678,7 @@ function MainPage({ user }) {
                       />
                     </div>
 
-                    {isModelVideo && !isCamera0 && (
-                      <>
-                        <div style={styles.cameraSettings}>
-                          <span
-                            style={{ fontWeight: 600, marginRight: 6, fontSize: 13 }}
-                          >
-                            Alert Sound:
-                          </span>
-                          {["sound1", "sound2", "sound3"].map((sound) => (
-                            <label
-                              key={sound}
-                              style={{ marginRight: 10, cursor: "pointer" }}
-                            >
-                              <input
-                                type="radio"
-                                name={`alertSound-${pair.pairId}-${cam.id}`}
-                                value={sound}
-                                checked={cam.alertSound === sound}
-                                onChange={() =>
-                                  setCameraAlertSound(pair.pairId, cam.id, sound)
-                                }
-                              />{" "}
-                              {sound}
-                            </label>
-                          ))}
-                        </div>
-
-                        <div style={styles.cameraSettings}>
-                          <span
-                            style={{ fontWeight: 600, marginRight: 6, fontSize: 13 }}
-                          >
-                            Volume:
-                          </span>
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={cam.volume}
-                            onChange={(e) =>
-                              changeVolume(pair.pairId, cam.id, +e.target.value)
-                            }
-                          />
-                          <span style={styles.volumeDisplay}>
-                            {cam.volume}%
-                          </span>
-                        </div>
-                      </>
-                    )}
-
+                    {/* Upload for real videos of non-sample pairs */}
                     {!isModelVideo && !isCamera0 && (
                       <div style={styles.cameraSettings}>
                         <label style={{ fontSize: 13 }}>
@@ -729,6 +701,7 @@ function MainPage({ user }) {
                       </div>
                     )}
 
+                    {/* Delete whole pair (non-sample, only on left card) */}
                     {!isCamera0 && cam.id === pair.cameras[0].id && (
                       <button
                         onClick={() => deleteCameraPair(pair.pairId)}
@@ -745,9 +718,6 @@ function MainPage({ user }) {
           );
         })}
       </div>
-
-      {/* Single hidden audio element for sounds */}
-      <audio ref={audioRef} />
 
       {/* Add camera pair */}
       <button style={styles.addCameraBtn} onClick={addCameraPair}>
@@ -776,82 +746,12 @@ function MainPage({ user }) {
         >
           Crowd Counting from Photo
         </button>
-
-        <button
-          style={styles.actionButton}
-          onClick={() => setAlertOpen((v) => !v)}
-        >
-          View Alerts
-        </button>
       </div>
 
-      {/* Alert panel */}
-      {alertOpen && (
-        <div style={styles.alertPanel} ref={alertRef}>
-          <div style={styles.alertTitle}>Alert Sound Settings</div>
-
-          <div>
-            <input
-              type="radio"
-              id="sound1"
-              name="globalAlertSound"
-              value="sound1"
-              checked={selectedSound === "sound1"}
-              onChange={() => setSelectedSound("sound1")}
-            />
-            <label htmlFor="sound1"> Sound 1</label>
-          </div>
-
-          <div>
-            <input
-              type="radio"
-              id="sound2"
-              name="globalAlertSound"
-              value="sound2"
-              checked={selectedSound === "sound2"}
-              onChange={() => setSelectedSound("sound2")}
-            />
-            <label htmlFor="sound2"> Sound 2</label>
-          </div>
-
-          <div>
-            <input
-              type="radio"
-              id="sound3"
-              name="globalAlertSound"
-              value="sound3"
-              checked={selectedSound === "sound3"}
-              onChange={() => setSelectedSound("sound3")}
-            />
-            <label htmlFor="sound3"> Sound 3</label>
-          </div>
-
-          <label htmlFor="volume" style={{ fontWeight: 600, fontSize: 13 }}>
-            Volume: {volume}%
-          </label>
-          <input
-            type="range"
-            id="volume"
-            min="0"
-            max="100"
-            value={volume}
-            onChange={(e) => setVolume(+e.target.value)}
-            style={styles.volumeInput}
-          />
-
-          <button
-            onClick={() => setAlertOpen(false)}
-            style={styles.closeBtn}
-          >
-            Close
-          </button>
-        </div>
-      )}
-
-      {/* System Settings panel */}
+      {/* System Settings panel (no sounds now) */}
       {systemSettingsOpen && (
-        <div style={styles.alertPanel} ref={systemSettingsRef}>
-          <div style={styles.alertTitle}>System Settings</div>
+        <div style={styles.sidePanel} ref={systemSettingsRef}>
+          <div style={styles.sidePanelTitle}>System Settings</div>
 
           <label style={{ fontWeight: 600, fontSize: 13 }}>Select Camera:</label>
           <select
