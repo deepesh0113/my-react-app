@@ -11,47 +11,75 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Query
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Form
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # ---------------- SETTINGS ----------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "crowd_counting.pth")
-
-# folder where all CSV outputs will be stored
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 USE_GPU = True
 USE_FP16_IF_CUDA = True
-FRAME_RESIZE = (512, 384)           # (width, height)
+FRAME_RESIZE = (512, 384)
 SKIP_FRAMES = 10
 SMOOTH_WINDOW = 3
-FLUSH_INTERVAL = 2.0
 PRINT_EVERY = 50
 UPSAMPLE_DMAP = False
 SCALE_BY_AREA = True
-# ------------------------------------------
 
 device = torch.device("cuda" if (USE_GPU and torch.cuda.is_available()) else "cpu")
 print("Device:", device)
 
-# ---------- Camera hinderance helpers ----------
-_hinder_counters = {
-    "frozen": 0,
-    "covered": 0,
-}
-FROZEN_DIFF_THRESH = 2.0
-FROZEN_FRAMES_THRESH = 5
-COVERED_MEAN_THRESH = 15
-COVERED_FRAMES_THRESH = 3
-LOW_CONTRAST_STD_THRESH = 10.0
-LOW_CONTRAST_FRAMES_THRESH = 5
-DARK_PCT_THRESH = 0.50
+# Email recipients
+ALERT_RECIPIENTS = [
+    "gaurav.kumar.ug22@nsut.ac.in",
+    "prateek.dhanker.ug22@nsut.ac.in",
+    "deepesh.kumar.ug22@nsut.ac.in",
+]
 
+def send_email_alert(current_count, threshold_value):
+    sender = os.getenv("EMAIL_USER")
+    password = os.getenv("EMAIL_PASS")
+
+    if not sender or not password:
+        print("[EMAIL] EMAIL_USER or EMAIL_PASS not set. Skipping email.")
+        return
+
+    safe_count = float(current_count) if current_count is not None else 0.0
+
+    subject = "🚨 VigilNet Crowd Alert - Threshold Exceeded"
+    body = (
+        "Alert from VigilNet System\n\n"
+        f"Threshold: {threshold_value}\n"
+        f"Current Count: {safe_count:.2f}\n\n"
+        "Immediate attention required."
+    )
+
+
+    msg = MIMEMultipart()
+    msg["From"] = sender
+    msg["To"] = ", ".join(ALERT_RECIPIENTS)
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(sender, password)
+            server.sendmail(sender, ALERT_RECIPIENTS, msg.as_string())
+        print("[EMAIL] Alert sent successfully.")
+    except Exception as e:
+        print("[EMAIL ERROR]", e)
+
+# ---------- Hinder helpers ----------
+_hinder_counters = {"frozen": 0, "covered": 0}
 _prev_gray_for_hinder = None
-
 
 def check_camera_hinder(frame_bgr):
     global _prev_gray_for_hinder, _hinder_counters
@@ -66,25 +94,24 @@ def check_camera_hinder(frame_bgr):
         diff = cv2.absdiff(gray, _prev_gray_for_hinder)
         diff_mean = float(diff.mean())
 
-    if diff_mean < FROZEN_DIFF_THRESH:
+    if diff_mean < 2.0:
         _hinder_counters["frozen"] += 1
     else:
         _hinder_counters["frozen"] = 0
 
-    if mean < COVERED_MEAN_THRESH and std < LOW_CONTRAST_STD_THRESH:
+    if mean < 15 and std < 10.0:
         _hinder_counters["covered"] += 1
     else:
         _hinder_counters["covered"] = 0
 
     reason = ""
-    if _hinder_counters["frozen"] >= FROZEN_FRAMES_THRESH:
+    if _hinder_counters["frozen"] >= 5:
         reason = "camera_frozen"
-    elif _hinder_counters["covered"] >= COVERED_FRAMES_THRESH:
+    elif _hinder_counters["covered"] >= 3:
         reason = "lens_covered_or_extremely_dark"
 
     _prev_gray_for_hinder = gray.copy()
     return bool(reason), reason
-
 
 def enhance_frame(frame_bgr,
                   gamma=1.6,
@@ -113,98 +140,55 @@ def enhance_frame(frame_bgr,
     img = np.clip(img, 0, 255).astype(np.uint8)
     return img
 
-
-# ---------- MCNN model ----------
+# ---------- MCNN Model ----------
 class MC_CNN(nn.Module):
     def __init__(self):
         super().__init__()
         self.column1 = nn.Sequential(
-            nn.Conv2d(3, 8, 9, padding='same'),
-            nn.ReLU(),
+            nn.Conv2d(3, 8, 9, padding='same'), nn.ReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(8, 16, 7, padding='same'),
-            nn.ReLU(),
+            nn.Conv2d(8, 16, 7, padding='same'), nn.ReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(16, 32, 7, padding='same'),
-            nn.ReLU(),
-            nn.Conv2d(32, 16, 7, padding='same'),
-            nn.ReLU(),
-            nn.Conv2d(16, 8, 7, padding='same'),
-            nn.ReLU(),
+            nn.Conv2d(16, 32, 7, padding='same'), nn.ReLU(),
+            nn.Conv2d(32, 16, 7, padding='same'), nn.ReLU(),
+            nn.Conv2d(16, 8, 7, padding='same'), nn.ReLU(),
         )
         self.column2 = nn.Sequential(
-            nn.Conv2d(3, 10, 7, padding='same'),
-            nn.ReLU(),
+            nn.Conv2d(3, 10, 7, padding='same'), nn.ReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(10, 20, 5, padding='same'),
-            nn.ReLU(),
+            nn.Conv2d(10, 20, 5, padding='same'), nn.ReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(20, 40, 5, padding='same'),
-            nn.ReLU(),
-            nn.Conv2d(40, 20, 5, padding='same'),
-            nn.ReLU(),
-            nn.Conv2d(20, 10, 5, padding='same'),
-            nn.ReLU(),
+            nn.Conv2d(20, 40, 5, padding='same'), nn.ReLU(),
+            nn.Conv2d(40, 20, 5, padding='same'), nn.ReLU(),
+            nn.Conv2d(20, 10, 5, padding='same'), nn.ReLU(),
         )
         self.column3 = nn.Sequential(
-            nn.Conv2d(3, 12, 5, padding='same'),
-            nn.ReLU(),
+            nn.Conv2d(3, 12, 5, padding='same'), nn.ReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(12, 24, 3, padding='same'),
-            nn.ReLU(),
+            nn.Conv2d(12, 24, 3, padding='same'), nn.ReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(24, 48, 3, padding='same'),
-            nn.ReLU(),
-            nn.Conv2d(48, 24, 3, padding='same'),
-            nn.ReLU(),
-            nn.Conv2d(24, 12, 3, padding='same'),
-            nn.ReLU(),
+            nn.Conv2d(24, 48, 3, padding='same'), nn.ReLU(),
+            nn.Conv2d(48, 24, 3, padding='same'), nn.ReLU(),
+            nn.Conv2d(24, 12, 3, padding='same'), nn.ReLU(),
         )
-        self.fusion_layer = nn.Sequential(
-            nn.Conv2d(30, 1, 1, padding=0),
-        )
+        self.fusion_layer = nn.Sequential(nn.Conv2d(30, 1, 1))
 
     def forward(self, img_tensor):
-        x1 = self.column1(img_tensor)
-        x2 = self.column2(img_tensor)
-        x3 = self.column3(img_tensor)
-        x = torch.cat((x1, x2, x3), 1)
-        x = self.fusion_layer(x)
-        return x
-
+        x = torch.cat((self.column1(img_tensor), self.column2(img_tensor), self.column3(img_tensor)), 1)
+        return self.fusion_layer(x)
 
 def load_model(path, device):
     m = MC_CNN().to(device).eval()
     ckpt = torch.load(path, map_location=device)
-    if isinstance(ckpt, dict) and 'state_dict' in ckpt:
-        state = ckpt['state_dict']
-    elif isinstance(ckpt, dict):
-        state = ckpt
-    elif isinstance(ckpt, nn.Module):
-        ckpt.to(device).eval()
-        return ckpt
-    else:
-        raise RuntimeError("Unsupported checkpoint format")
-
-    new_state = {}
-    for k, v in state.items():
-        nk = k[len('module.'):] if k.startswith('module.') else k
-        new_state[nk] = v
-
-    missing, unexpected = m.load_state_dict(new_state, strict=False)
-    if missing or unexpected:
-        print("load_state_dict warnings:")
-        if missing:
-            print(" missing:", missing[:6], "...")
-        if unexpected:
-            print(" unexpected:", list(unexpected)[:6], "...")
+    if isinstance(ckpt, dict) and "state_dict" in ckpt:
+        ckpt = ckpt["state_dict"]
+    new_state = {k.replace("module.", ""): v for k, v in ckpt.items()}
+    m.load_state_dict(new_state, strict=False)
     return m
 
-
 model = load_model(MODEL_PATH, device)
-if device.type == 'cuda' and USE_FP16_IF_CUDA:
+if device.type == "cuda" and USE_FP16_IF_CUDA:
     model.half()
-
 
 def frame_to_tensor(frame_bgr):
     if FRAME_RESIZE is not None:
@@ -213,50 +197,26 @@ def frame_to_tensor(frame_bgr):
     arr = np.asarray(rgb, dtype=np.float32) / 255.0
     arr = np.transpose(arr, (2, 0, 1))
     tensor = torch.from_numpy(arr).unsqueeze(0)
-    if device.type == 'cuda' and USE_FP16_IF_CUDA:
-        tensor = tensor.half().to(device, non_blocking=True)
-    else:
-        tensor = tensor.to(device, non_blocking=True)
-    return tensor
+    return tensor.half().to(device) if device.type == "cuda" and USE_FP16_IF_CUDA else tensor.to(device)
 
-
-def ms_to_time_str(t_ms):
-    # (still named timestamp_ns in header, but human-readable mm:ss:ms)
-    ms = int(t_ms % 1000)
-    total_seconds = int(t_ms // 1000)
-    minutes = total_seconds // 60
-    seconds = total_seconds % 60
-    return f"{minutes:02d}:{seconds:02d}:{ms:03d}"
-
-
-# ---------- per-run tracking ----------
-RUNS = {}  # run_id -> {"csv": str, "done": bool}
+# ---------- Processing ----------
+RUNS = {}          # run_id -> {"csv": str, "done": bool, "alert_sent": bool}
+RUN_THRESHOLDS = {}  # run_id -> float threshold
 RUNS_LOCK = threading.Lock()
 
-
 def process_video_to_csv(video_path: str, run_id: str, csv_path: str):
-    """
-    Process a single video → MCNN counts + hinder detection.
-    Writes CSV to disk AND keeps in-memory CSV string for live UI.
-    CSV format: date,timestamp_ns,count,alert
-    """
     global _hinder_counters, _prev_gray_for_hinder
-    _hinder_counters = {k: 0 for k in _hinder_counters}
+    _hinder_counters = {"frozen": 0, "covered": 0}
     _prev_gray_for_hinder = None
 
-    # in-memory buffer (for frontend live display)
     buf = StringIO()
     mem_writer = csv.writer(buf)
-
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    header = ["date", "timestamp_ns", "count", "alert"]
+    header = ["date", "timestamp", "count", "alert"]
     mem_writer.writerow(header)
 
-    # open video
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print("Cannot open video:", video_path)
-        # write empty CSV (header only) to disk too
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
             disk_writer = csv.writer(f)
             disk_writer.writerow(header)
@@ -265,15 +225,12 @@ def process_video_to_csv(video_path: str, run_id: str, csv_path: str):
             RUNS[run_id]["done"] = True
         return
 
-    # open disk CSV file
     f = open(csv_path, "w", newline="", encoding="utf-8")
     disk_writer = csv.writer(f)
     disk_writer.writerow(header)
 
     smoother = []
     processed = 0
-    last_flush = time.time()
-    start_wall = time.time()
 
     with torch.no_grad():
         while True:
@@ -288,23 +245,13 @@ def process_video_to_csv(video_path: str, run_id: str, csv_path: str):
 
             enhanced = enhance_frame(frame, gamma=1.6, use_clahe=True, denoise=False)
             inp = frame_to_tensor(enhanced)
-
             out = model(inp)
-
-            if device.type == 'cuda' and USE_FP16_IF_CUDA:
-                out_f = out.float()
-            else:
-                out_f = out
-
+            out_f = out.float() if device.type == "cuda" else out
             out_f = torch.relu(out_f)
 
-            if device.type == 'cuda' and USE_FP16_IF_CUDA:
-                dmap = out_f.float().squeeze(0).squeeze(0)
-            else:
-                dmap = out_f.squeeze(0).squeeze(0)
+            dmap = out_f.squeeze(0).squeeze(0)
 
             orig_h, orig_w = frame.shape[:2]
-
             if FRAME_RESIZE is not None:
                 feed_w, feed_h = FRAME_RESIZE
             else:
@@ -336,42 +283,40 @@ def process_video_to_csv(video_path: str, run_id: str, csv_path: str):
                 display_count = count_val
 
             t_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
-            time_str = ms_to_time_str(t_ms)
+            time_sec = round(t_ms / 1000.0, 3)
+            date_now = datetime.now().strftime("%Y-%m-%d")
 
             is_hindered, reason = check_camera_hinder(frame)
             alert_field = reason if is_hindered else ""
             if is_hindered:
                 display_count = 0.00
 
-            row = [
-                today_str,
-                time_str,
-                f"{display_count:.3f}",
-                alert_field
-            ]
+            # ---------- Threshold-based email alert ----------
+            thr_val = None
+            with RUNS_LOCK:
+                if run_id in RUN_THRESHOLDS:
+                    thr_val = RUN_THRESHOLDS[run_id]
 
-            # write to in-memory + disk
+            if thr_val is not None and display_count > thr_val:
+                with RUNS_LOCK:
+                    already_sent = RUNS.get(run_id, {}).get("alert_sent", False)
+                    if not already_sent:
+                        print(f"[EMAIL] Threshold exceeded: {display_count:.2f} > {thr_val}")
+                        send_email_alert(display_count, thr_val)
+                        RUNS[run_id]["alert_sent"] = True
+                        alert_field = (alert_field + "; " if alert_field else "") + "threshold_exceeded"
+            # -------------------------------------------------
+
+            row = [date_now, time_sec, f"{display_count:.3f}", alert_field]
             mem_writer.writerow(row)
             disk_writer.writerow(row)
 
-            # ⭐ REAL-TIME UPDATE: update in-memory CSV every frame
             with RUNS_LOCK:
                 RUNS[run_id]["csv"] = buf.getvalue()
 
             processed += 1
-
-            # ⭐ Only gate DISK flushing by time, not memory updates
-            if time.time() - last_flush > FLUSH_INTERVAL:
-                f.flush()
-                last_flush = time.time()
-
             if processed % PRINT_EVERY == 0:
-                elapsed = time.time() - start_wall
-                fps_eff = processed / elapsed if elapsed > 0 else 0
-                print(
-                    f"Processed {processed} frames (effective FPS: {fps_eff:.2f}), "
-                    f"last count {display_count:.2f}"
-                )
+                print(f"Processed {processed} frames, last count {display_count:.2f}")
 
     cap.release()
     f.flush()
@@ -387,13 +332,9 @@ def process_video_to_csv(video_path: str, run_id: str, csv_path: str):
     print("Finished. Stored CSV in memory and disk for run_id:", run_id)
     print("CSV saved at:", csv_path)
 
-
-def run_processing(video_path: str, run_id: str):
+def run_processing(video_path: str, run_id: str, csv_path: str):
     with RUNS_LOCK:
-        RUNS[run_id] = {"csv": "", "done": False}
-
-    csv_filename = f"output_with_hinderance_{run_id}.csv"
-    csv_path = os.path.join(OUTPUT_DIR, csv_filename)
+        RUNS[run_id] = {"csv": "", "done": False, "alert_sent": False}
 
     process_video_to_csv(video_path, run_id, csv_path)
 
@@ -401,7 +342,6 @@ def run_processing(video_path: str, run_id: str):
         os.remove(video_path)
     except OSError:
         pass
-
 
 # ---------- FastAPI ----------
 app = FastAPI(title="Video Analytics API")
@@ -414,14 +354,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# CORE
 @app.post("/process_video/")
-async def process_video(
+async def analytics_process_video(
     background_tasks: BackgroundTasks,
     video: UploadFile = File(...),
+    threshold: float = Form(...),
 ):
     run_id = str(int(time.time() * 1000))
     print(f"[process_video] run_id={run_id}")
+
+    csv_filename = f"output_with_hinderance_{run_id}.csv"
+    csv_path = os.path.join(OUTPUT_DIR, csv_filename)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
         temp_video_path = tmp.name
@@ -432,12 +375,15 @@ async def process_video(
                 break
             tmp.write(chunk)
 
-    background_tasks.add_task(run_processing, temp_video_path, run_id)
+    with RUNS_LOCK:
+        RUN_THRESHOLDS[run_id] = float(threshold)
+
+    background_tasks.add_task(run_processing, temp_video_path, run_id, csv_path)
     return {"status": "processing_started", "run_id": run_id}
 
 
 @app.get("/crowd_txt/{run_id}")
-async def crowd_txt(run_id: str):
+async def analytics_crowd_txt(run_id: str):
     with RUNS_LOCK:
         run_info = RUNS.get(run_id)
     if not run_info:
@@ -447,21 +393,3 @@ async def crowd_txt(run_id: str):
         "done": run_info.get("done", False),
     })
 
-
-# ALIASES WITH /analytics PREFIX
-@app.post("/analytics/process_video/")
-async def analytics_process_video(
-    background_tasks: BackgroundTasks,
-    video: UploadFile = File(...),
-):
-    return await process_video(background_tasks, video)
-
-
-@app.get("/analytics/crowd_txt/")
-async def analytics_crowd_txt_query(run_id: str = Query(...)):
-    return await crowd_txt(run_id)
-
-
-@app.get("/analytics/crowd_txt/{run_id}")
-async def analytics_crowd_txt_path(run_id: str):
-    return await crowd_txt(run_id)

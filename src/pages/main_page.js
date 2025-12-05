@@ -16,6 +16,9 @@ function useWindowWidth() {
 
 function MainPage({ user }) {
   const navigate = useNavigate();
+  const [threshold, setThreshold] = useState("");
+  const [liveCount, setLiveCount] = useState(null);
+  const [analysisStarted, setAnalysisStarted] = useState(false);
 
   const [systemSettingsOpen, setSystemSettingsOpen] = useState(false);
   const systemSettingsRef = useRef(null);
@@ -28,7 +31,6 @@ function MainPage({ user }) {
   const width = useWindowWidth();
   const isMobile = width < 700;
 
-  // Clear polling timers on unmount
   useEffect(() => {
     return () => {
       Object.values(pollTimers).forEach((id) => clearInterval(id));
@@ -283,7 +285,6 @@ function MainPage({ user }) {
     },
   };
 
-  // Start with no pairs; user clicks "+ Add New Feed"
   const [cameraPairs, setCameraPairs] = useState([]);
 
   const [availableCameras] = useState([
@@ -340,14 +341,9 @@ function MainPage({ user }) {
     );
   };
 
-  // Upload + live CSV polling
   const uploadVideoFile = async (pairId, cameraId, file) => {
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append("video", file); // MUST be "video" to match backend
-
-    // show video immediately on left
     setCameraPairs((pairs) =>
       pairs.map((pair) =>
         pair.pairId === pairId
@@ -355,76 +351,84 @@ function MainPage({ user }) {
               ...pair,
               cameras: pair.cameras.map((cam) =>
                 cam.id === cameraId
-                  ? {
-                      ...cam,
-                      src: URL.createObjectURL(file),
-                      uploadedFile: file,
-                    }
+                  ? { ...cam, src: URL.createObjectURL(file), uploadedFile: file }
                   : cam
               ),
             }
           : pair
       )
     );
+  };
 
-    let runId;
-    try {
-      const res = await fetch(`${API_BASE}/analytics/process_video/`, {
-  method: "POST",
-  body: formData,
-});
+  const startAnalysis = async (pairId, cameraId) => {
+  const targetPair = cameraPairs.find((p) => p.pairId === pairId);
+  const cam = targetPair.cameras.find((c) => c.id === cameraId);
 
-      if (!res.ok) {
-        console.error("process_video failed:", res.status, await res.text());
-        return;
-      }
-      const data = await res.json();
-      runId = data.run_id;
-      if (!runId) {
-        console.error("No run_id returned from backend:", data);
-        return;
-      }
-    } catch (err) {
-      console.error("Error starting processing:", err);
+  if (!cam.uploadedFile) {
+    alert("Upload a video before starting analysis.");
+    return;
+  }
+  if (!threshold) {
+    alert("Please enter threshold before analysis.");
+    return;
+  }
+
+  setAnalysisStarted(true);
+
+  const formData = new FormData();
+  formData.append("video", cam.uploadedFile);
+  formData.append("threshold", threshold);   // ⭐ IMPORTANT
+
+  try {
+    const res = await fetch(`${API_BASE}/analytics/process_video/`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (!data.run_id) {
+      console.error("No run_id in response", data);
+      setAnalysisStarted(false);
       return;
     }
 
-    // stop old poller for this pair
-    if (pollTimers[pairId]) {
-      clearInterval(pollTimers[pairId]);
-    }
+    const runId = data.run_id;
+    pollResults(pairId, runId);
+  } catch (err) {
+    console.error("Error during analysis:", err);
+  }
 
-    let intervalId;
+  setAnalysisStarted(false);
+};
 
-    const poll = () => {
-      //  fetch(`${API_BASE}/analytics/crowd_txt/?run_id=${encodeURIComponent(runId)}`)
-      fetch(`${API_BASE}/analytics/crowd_txt/${encodeURIComponent(runId)}`)
+
+  const pollResults = (pairId, runId) => {
+    if (pollTimers[pairId]) clearInterval(pollTimers[pairId]);
+
+    let intervalId = setInterval(() => {
+      fetch(`${API_BASE}/analytics/crowd_txt/${runId}`)
         .then((r) => r.json())
         .then((data) => {
-          if (!data) return;
-          const { csv, done } = data;
+          if (!data || !data.csv) return;
+
           setCrowdTxtMap((prev) => ({
             ...prev,
-            [pairId]: csv || "",
+            [pairId]: data.csv,
           }));
 
-          if (done && intervalId) {
-            clearInterval(intervalId);
-            setPollTimers((prev) => {
-              const copy = { ...prev };
-              delete copy[pairId];
-              return copy;
-            });
+          const lines = data.csv.trim().split("\n");
+          if (lines.length >= 2) {
+            const lastRow = lines[lines.length - 1].split(",");
+            const countVal = parseFloat(lastRow[2]);
+            if (!isNaN(countVal)) setLiveCount(countVal);
           }
-        })
-        .catch((err) => {
-          console.error("Error fetching crowd_txt:", err);
-        });
-    };
 
-    intervalId = setInterval(poll, 500);
+          if (data.done) clearInterval(intervalId);
+        })
+        .catch((err) => console.error("POLL ERROR:", err));
+    }, 800);
+
     setPollTimers((prev) => ({ ...prev, [pairId]: intervalId }));
-    poll(); // first immediate call
   };
 
   const addCameraPair = () => {
@@ -449,7 +453,7 @@ function MainPage({ user }) {
             src: "",
             on: true,
             uploadedFile: null,
-            role: "real", // left card: video + upload
+            role: "real",
           },
           {
             id: rightId,
@@ -457,7 +461,7 @@ function MainPage({ user }) {
             src: "",
             on: true,
             uploadedFile: null,
-            role: "csv", // right card: CSV only
+            role: "csv",
           },
         ],
       },
@@ -465,7 +469,6 @@ function MainPage({ user }) {
   };
 
   const deleteCameraPair = (pairId) => {
-    // stop polling for this pair
     if (pollTimers[pairId]) {
       clearInterval(pollTimers[pairId]);
       setPollTimers((prev) => {
@@ -601,13 +604,34 @@ function MainPage({ user }) {
                               marginBottom: 6,
                             }}
                           >
-                            <div style={styles.csvTitle}>Crowd CSV (live)</div>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+  <div style={styles.csvTitle}>Crowd CSV (live)</div>
+
+  <button
+    onClick={() => downloadCsvForPair(pair.pairId, cam.name)}
+    style={{
+      backgroundColor: "#0ea5e9",
+      color: "#0b1120",
+      border: "none",
+      borderRadius: "8px",
+      padding: "4px 10px",
+      fontSize: "12px",
+      fontWeight: "600",
+      marginLeft: "400px", 
+      cursor: "pointer",
+    }}
+  >
+    Download CSV
+  </button>
+</div>
+
                           </div>
 
                           <CsvViewer
                             csvText={crowdTxtMap[pair.pairId]}
                             fallbackMessage="Upload a video on the left to stream CSV from backend."
                             styleOverride={styles.csvContent}
+                            threshold={threshold}
                           />
                         </div>
                       ) : (
@@ -624,7 +648,7 @@ function MainPage({ user }) {
                             </div>
                           ) : isVideo ? (
                             <video
-                              key={cam.src} // force remount on new upload
+                              key={cam.src}
                               autoPlay
                               muted
                               loop
@@ -667,7 +691,6 @@ function MainPage({ user }) {
                     />
                   </div>
 
-                  {/* Upload input only for left (real) cameras */}
                   {cam.role === "real" && (
                     <div style={styles.cameraSettings}>
                       <label style={{ fontSize: 13 }}>
@@ -686,11 +709,54 @@ function MainPage({ user }) {
                           }}
                           style={styles.uploadInput}
                         />
+
+                        <div style={{ marginTop: "10px" }}>
+                          <label
+                            style={{
+                              marginRight: "8px",
+                              fontSize: "14px",
+                              color: "#93c5fd",
+                            }}
+                          >
+                            Threshold:
+                          </label>
+
+                          <input
+                            type="number"
+                            value={threshold}
+                            onChange={(e) => setThreshold(e.target.value)}
+                            placeholder="Enter threshold"
+                            style={{
+                              padding: "6px 10px",
+                              border: "1px solid #374151",
+                              borderRadius: "8px",
+                              backgroundColor: "#0f172a",
+                              color: "white",
+                              fontSize: "13px",
+                              width: "150px",
+                            }}
+                          />
+
+                          <button
+                            onClick={() => startAnalysis(pair.pairId, cam.id)}
+                            style={{
+                              marginLeft: "12px",
+                              padding: "6px 16px",
+                              backgroundColor: "#0ea5e9",
+                              color: "#0b1120",
+                              fontWeight: "600",
+                              borderRadius: "10px",
+                              cursor: "pointer",
+                              border: "none",
+                            }}
+                          >
+                            {analysisStarted ? "Processing..." : "Start Analysis"}
+                          </button>
+                        </div>
                       </label>
                     </div>
                   )}
 
-                  {/* Delete whole pair (only show on left card) */}
                   {cam.role === "real" && (
                     <button
                       onClick={() => deleteCameraPair(pair.pairId)}
