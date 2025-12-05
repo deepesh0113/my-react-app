@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from "react";
 
-export default function CsvViewer({ csvText, fallbackMessage, styleOverride = {} }) {
+
+
+export default function CsvViewer({ csvText, fallbackMessage, styleOverride = {}, threshold }) {
+
   const [showRaw, setShowRaw] = useState(false);
   const [rowsPerPage, setRowsPerPage] = useState(100);
   const [page, setPage] = useState(0);
@@ -112,9 +115,22 @@ export default function CsvViewer({ csvText, fallbackMessage, styleOverride = {}
                     }}>
                       {parsed.headers.map((h, j) => {
                         const val = r[h] ?? r[parsed.headers[j]] ?? "";
-                        if (h.toLowerCase().includes("crowd")) {
-                          return <td key={j} style={tdStyle}><strong>{formatCount(val)}</strong></td>;
-                        }
+                       // COUNT COLUMN coloring
+if (h.toLowerCase().includes("count")) {
+  const num = parseFloat(val);
+  let color = "lightgreen";
+  if (!isNaN(num)) {
+    if (threshold !== undefined && threshold !== null && threshold !== "") {
+      color = num > threshold ? "red" : num == threshold ? "yellow" : "lightgreen";
+    }
+  }
+  return (
+    <td key={j} style={{ ...tdStyle, color: color, fontWeight: 700 }}>
+      {formatCount(val)}
+    </td>
+  );
+}
+
                         if (h.toLowerCase().includes("alert")) {
                           return <td key={j} style={tdStyle}>{badgeForAlert(val) || <span style={{opacity:0.7}}>None</span>}</td>;
                         }
