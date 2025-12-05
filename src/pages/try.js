@@ -752,132 +752,132 @@
 //               </div>
 
 //               {/* GRAPH 2: Per-second average (bar chart) */}
-//               <div style={styles.graphBox}>
-//                 <div style={styles.graphTitle}>
-//                   Per-second average crowd level
-//                 </div>
-//                 <div style={styles.graphSubtitle}>
-//                   Bars show average count per whole second – green safe, red
-//                   alert.
-//                 </div>
+              // <div style={styles.graphBox}>
+              //   <div style={styles.graphTitle}>
+              //     Per-second average crowd level
+              //   </div>
+              //   <div style={styles.graphSubtitle}>
+              //     Bars show average count per whole second – green safe, red
+              //     alert.
+              //   </div>
 
-//                 <button
-//                   style={styles.detailBtn}
-//                   onClick={() =>
-//                     setShowPerSecondDetails((prev) => !prev)
-//                   }
-//                 >
-//                   {showPerSecondDetails ? "Hide details" : "Show details"}
-//                 </button>
+              //   <button
+              //     style={styles.detailBtn}
+              //     onClick={() =>
+              //       setShowPerSecondDetails((prev) => !prev)
+              //     }
+              //   >
+              //     {showPerSecondDetails ? "Hide details" : "Show details"}
+              //   </button>
 
-//                 <div style={styles.graphArea}>
-//                   {perSecondData.length === 0 ? (
-//                     <div style={styles.graphPlaceholder}>
-//                       Upload a CSV to see per-second averages.
-//                     </div>
-//                   ) : (
-//                     <ResponsiveContainer width="100%" height="100%">
-//                       <BarChart data={perSecondData}>
-//                         <CartesianGrid strokeDasharray="3 3" />
-//                         <XAxis
-//                           dataKey="second"
-//                           tick={{ fill: "#93c5fd", fontSize: 11 }}
-//                           label={{
-//                             value: "Second",
-//                             position: "insideBottom",
-//                             offset: -4,
-//                             fill: "#6b7280",
-//                             fontSize: 11,
-//                           }}
-//                         />
-//                         <YAxis
-//                           tick={{ fill: "#93c5fd", fontSize: 11 }}
-//                           label={{
-//                             value: "Avg Count",
-//                             angle: -90,
-//                             position: "insideLeft",
-//                             fill: "#6b7280",
-//                             fontSize: 11,
-//                           }}
-//                         />
-//                         <Tooltip
-//                           contentStyle={{
-//                             backgroundColor: "#020617",
-//                             border: "1px solid #1e293b",
-//                             borderRadius: 8,
-//                             fontSize: 11,
-//                           }}
-//                           labelStyle={{ color: "#e5e7eb" }}
-//                         />
-//                         <Legend />
-//                         <Bar dataKey="avg_count" name="Avg count">
-//                           {perSecondData.map((entry, index) => {
-//                             const v = entry.avg_count;
-//                             let fillColor = "#60a5fa";
-//                             if (thresholdsActive) {
-//                               if (v > parsedMax) fillColor = RED;
-//                               else if (
-//                                 v >= parsedMin &&
-//                                 v <= parsedMax
-//                               )
-//                                 fillColor = GREEN;
-//                               else fillColor = AMBER;
-//                             }
-//                             return (
-//                               <Cell key={`cell-${index}`} fill={fillColor} />
-//                             );
-//                           })}
-//                         </Bar>
-//                         {thresholdsActive && (
-//                           <>
-//                             <ReferenceLine
-//                               y={parsedMin}
-//                               stroke={GREEN}
-//                               strokeDasharray="3 3"
-//                             />
-//                             <ReferenceLine
-//                               y={parsedMax}
-//                               stroke={RED}
-//                               strokeDasharray="3 3"
-//                             />
-//                           </>
-//                         )}
-//                       </BarChart>
-//                     </ResponsiveContainer>
-//                   )}
-//                 </div>
+              //   <div style={styles.graphArea}>
+              //     {perSecondData.length === 0 ? (
+              //       <div style={styles.graphPlaceholder}>
+              //         Upload a CSV to see per-second averages.
+              //       </div>
+              //     ) : (
+              //       <ResponsiveContainer width="100%" height="100%">
+              //         <BarChart data={perSecondData}>
+              //           <CartesianGrid strokeDasharray="3 3" />
+              //           <XAxis
+              //             dataKey="second"
+              //             tick={{ fill: "#93c5fd", fontSize: 11 }}
+              //             label={{
+              //               value: "Second",
+              //               position: "insideBottom",
+              //               offset: -4,
+              //               fill: "#6b7280",
+              //               fontSize: 11,
+              //             }}
+              //           />
+              //           <YAxis
+              //             tick={{ fill: "#93c5fd", fontSize: 11 }}
+              //             label={{
+              //               value: "Avg Count",
+              //               angle: -90,
+              //               position: "insideLeft",
+              //               fill: "#6b7280",
+              //               fontSize: 11,
+              //             }}
+              //           />
+              //           <Tooltip
+              //             contentStyle={{
+              //               backgroundColor: "#020617",
+              //               border: "1px solid #1e293b",
+              //               borderRadius: 8,
+              //               fontSize: 11,
+              //             }}
+              //             labelStyle={{ color: "#e5e7eb" }}
+              //           />
+              //           <Legend />
+              //           <Bar dataKey="avg_count" name="Avg count">
+              //             {perSecondData.map((entry, index) => {
+              //               const v = entry.avg_count;
+              //               let fillColor = "#60a5fa";
+              //               if (thresholdsActive) {
+              //                 if (v > parsedMax) fillColor = RED;
+              //                 else if (
+              //                   v >= parsedMin &&
+              //                   v <= parsedMax
+              //                 )
+              //                   fillColor = GREEN;
+              //                 else fillColor = AMBER;
+              //               }
+              //               return (
+              //                 <Cell key={`cell-${index}`} fill={fillColor} />
+              //               );
+              //             })}
+              //           </Bar>
+              //           {thresholdsActive && (
+              //             <>
+              //               <ReferenceLine
+              //                 y={parsedMin}
+              //                 stroke={GREEN}
+              //                 strokeDasharray="3 3"
+              //               />
+              //               <ReferenceLine
+              //                 y={parsedMax}
+              //                 stroke={RED}
+              //                 strokeDasharray="3 3"
+              //               />
+              //             </>
+              //           )}
+              //         </BarChart>
+              //       </ResponsiveContainer>
+              //     )}
+              //   </div>
 
-//                 {showPerSecondDetails && thresholdsActive && (
-//                   <div style={styles.detailPanel}>
-//                     <div style={styles.detailSectionTitle}>
-//                       Alert seconds (avg &gt; max)
-//                     </div>
-//                     {getPerSecondAlerts().length === 0 ? (
-//                       <div>No alert seconds.</div>
-//                     ) : (
-//                       getPerSecondAlerts().map((p, idx) => (
-//                         <div key={`pa-${idx}`}>
-//                           second = {p.second}, avg ={" "}
-//                           {p.avg_count.toFixed(3)}
-//                         </div>
-//                       ))
-//                     )}
-//                     <div style={styles.detailSectionTitle}>
-//                       Safe seconds (between min &amp; max)
-//                     </div>
-//                     {getPerSecondSafe().length === 0 ? (
-//                       <div>No safe seconds for current thresholds.</div>
-//                     ) : (
-//                       getPerSecondSafe().map((p, idx) => (
-//                         <div key={`ps-${idx}`}>
-//                           second = {p.second}, avg ={" "}
-//                           {p.avg_count.toFixed(3)}
-//                         </div>
-//                       ))
-//                     )}
-//                   </div>
-//                 )}
-//               </div>
+              //   {showPerSecondDetails && thresholdsActive && (
+              //     <div style={styles.detailPanel}>
+              //       <div style={styles.detailSectionTitle}>
+              //         Alert seconds (avg &gt; max)
+              //       </div>
+              //       {getPerSecondAlerts().length === 0 ? (
+              //         <div>No alert seconds.</div>
+              //       ) : (
+              //         getPerSecondAlerts().map((p, idx) => (
+              //           <div key={`pa-${idx}`}>
+              //             second = {p.second}, avg ={" "}
+              //             {p.avg_count.toFixed(3)}
+              //           </div>
+              //         ))
+              //       )}
+              //       <div style={styles.detailSectionTitle}>
+              //         Safe seconds (between min &amp; max)
+              //       </div>
+              //       {getPerSecondSafe().length === 0 ? (
+              //         <div>No safe seconds for current thresholds.</div>
+              //       ) : (
+              //         getPerSecondSafe().map((p, idx) => (
+              //           <div key={`ps-${idx}`}>
+              //             second = {p.second}, avg ={" "}
+              //             {p.avg_count.toFixed(3)}
+              //           </div>
+              //         ))
+              //       )}
+              //     </div>
+              //   )}
+              // </div>
 
 //               {/* GRAPH 3: Frame index vs count */}
 //               <div style={styles.graphBox}>
@@ -12130,3 +12130,442 @@ export default Dashboard;
 
 
 
+{viewMode === "day" ? (
+              <>
+                {/* DAY-WISE GRAPH 1 */}
+                <div style={styles.graphBox}>
+                  <div style={styles.graphTitle}>
+                    Crowd trends (time-series, per day)
+                  </div>
+                  <div style={styles.graphSubtitle}>
+                    time_sec vs count – green = within safe range, red = above
+                    alert threshold.
+                  </div>
+
+                  <button
+                    style={styles.detailBtn}
+                    onClick={() =>
+                      setShowTimeDetails((prev) => !prev)
+                    }
+                  >
+                    {showTimeDetails ? "Hide details" : "Show details"}
+                  </button>
+
+                  <div style={styles.graphArea}>
+                    {graphData.length === 0 ? (
+                      <div style={styles.graphPlaceholder}>
+                        Upload a CSV file and pick a date to render the
+                        time–series chart.
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={graphData}>
+                          <XAxis
+                            dataKey="timestamp"
+                            tick={{
+                              fill: "#93c5fd",
+                              fontSize: 11,
+                            }}
+                            label={{
+                              value: "Time (sec)",
+                              position: "insideBottom",
+                              offset: -4,
+                              fill: "#6b7280",
+                              fontSize: 11,
+                            }}
+                          />
+                          <YAxis
+                            tick={{
+                              fill: "#93c5fd",
+                              fontSize: 11,
+                            }}
+                            label={{
+                              value: "Count",
+                              angle: -90,
+                              position: "insideLeft",
+                              fill: "#6b7280",
+                              fontSize: 11,
+                            }}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: "#020617",
+                              border: "1px solid #1e293b",
+                              borderRadius: 8,
+                              fontSize: 11,
+                            }}
+                            labelStyle={{ color: "#e5e7eb" }}
+                          />
+                          {thresholdsActive && (
+                            <>
+                              <ReferenceLine
+                                y={parsedMin}
+                                stroke={GREEN}
+                                strokeDasharray="3 3"
+                                label={{
+                                  value: "Min safe",
+                                  fill: GREEN,
+                                  fontSize: 10,
+                                }}
+                              />
+                              <ReferenceLine
+                                y={parsedMax}
+                                stroke={RED}
+                                strokeDasharray="3 3"
+                                label={{
+                                  value: "Max alert",
+                                  fill: RED,
+                                  fontSize: 10,
+                                }}
+                              />
+                            </>
+                          )}
+                          <Line
+                            type="monotone"
+                            dataKey="count"
+                            stroke={BLUE}
+                            strokeWidth={2}
+                            dot={renderColoredDot}
+                            activeDot={{ r: 5 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+
+                  {showTimeDetails && thresholdsActive && (
+                    <div style={styles.detailPanel}>
+                      <div style={styles.detailSectionTitle}>
+                        Alert points (count &gt; max)
+                      </div>
+                      {getTimeAlerts().length === 0 ? (
+                        <div>No alert points.</div>
+                      ) : (
+                        getTimeAlerts().map((p, idx) => (
+                          <div key={`ta-${idx}`}>
+                            date = {p.date}, t = {p.timestamp}, count ={" "}
+                            {p.count.toFixed(3)}{" "}
+                            {p.alert ? `(alert: ${p.alert})` : ""}
+                          </div>
+                        ))
+                      )}
+                      <div style={styles.detailSectionTitle}>
+                        Safe points (between min &amp; max)
+                      </div>
+                      {getTimeSafe().length === 0 ? (
+                        <div>
+                          No safe points based on current thresholds.
+                        </div>
+                      ) : (
+                        getTimeSafe().map((p, idx) => (
+                          <div key={`ts-${idx}`}>
+                            date = {p.date}, t = {p.timestamp}, count ={" "}
+                            {p.count.toFixed(3)}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* DAY-WISE GRAPH 2 – per-second avg */}
+                <div style={styles.graphBox}>
+                  <div style={styles.graphTitle}>
+                    Per-second average crowd level (selected day)
+                  </div>
+                  <div style={styles.graphSubtitle}>
+                    Bars show average count per whole second –
+                    <span style={{ color: GREEN }}> green</span> = safe,
+                    <span style={{ color: RED }}> red</span> = alert,
+                    <span style={{ color: AMBER }}> amber</span> = below min.
+                  </div>
+
+                  <button
+                    style={styles.detailBtn}
+                    onClick={() => setShowPerSecondDetails((prev) => !prev)}
+                  >
+                    {showPerSecondDetails ? "Hide details" : "Show details"}
+                  </button>
+
+                  <div style={styles.graphArea}>
+                    {perSecondData.length === 0 ? (
+                      <div style={styles.graphPlaceholder}>
+                        Upload a CSV and select a date to see per-second averages.
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={perSecondData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="second"
+                            tick={{ fill: "#93c5fd", fontSize: 11 }}
+                            label={{
+                              value: "Second",
+                              position: "insideBottom",
+                              offset: -4,
+                              fill: "#6b7280",
+                              fontSize: 11,
+                            }}
+                          />
+                          <YAxis
+                            tick={{ fill: "#93c5fd", fontSize: 11 }}
+                            label={{
+                              value: "Avg Count",
+                              angle: -90,
+                              position: "insideLeft",
+                              fill: "#6b7280",
+                              fontSize: 11,
+                            }}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: "#020617",
+                              border: "1px solid #1e293b",
+                              borderRadius: 8,
+                              fontSize: 11,
+                            }}
+                            labelStyle={{ color: "#e5e7eb" }}
+                            formatter={(value) => value.toFixed(3)}
+                          />
+
+
+                          <Legend
+                            payload={[
+                              {
+                                id: "safe",
+                                type: "square",
+                                value: "Safe (between min & max)",
+                                color: GREEN,
+                              },
+                              {
+                                id: "alert",
+                                type: "square",
+                                value: "Alert (> max)",
+                                color: RED,
+                              },
+                              {
+                                id: "low",
+                                type: "square",
+                                value: "Below min",
+                                color: AMBER,
+                              },
+                            ]}
+                          />
+
+                          <Bar dataKey="avg_count" name="Avg count">
+                            {perSecondData.map((entry, index) => {
+                              const v = Number(entry.avg_count);
+                              let fillColor = "#60a5fa";
+
+                              if (thresholdsActive) {
+                                if (v > parsedMax) {
+                                  fillColor = RED;
+                                } else if (v >= parsedMin && v <= parsedMax) {
+                                  fillColor = GREEN;
+                                } else {
+                                  fillColor = AMBER;
+                                }
+                              }
+
+                              return (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={fillColor}
+                                />
+                              );
+                            })}
+                          </Bar>
+
+
+                          {thresholdsActive && (
+                            <>
+                              <ReferenceLine
+                                y={parsedMin}
+                                stroke={GREEN}
+                                strokeDasharray="3 3"
+                                label={{
+                                  value: `Min safe (${parsedMin})`,
+                                  position: "insideTopLeft",
+                                  fill: GREEN,
+                                  fontSize: 10,
+                                }}
+                              />
+                              <ReferenceLine
+                                y={parsedMax}
+                                stroke={RED}
+                                strokeDasharray="3 3"
+                                label={{
+                                  value: `Max alert (${parsedMax})`,
+                                  position: "insideTopLeft",
+                                  fill: RED,
+                                  fontSize: 10,
+                                }}
+                              />
+                            </>
+                          )}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+
+                  {showPerSecondDetails && thresholdsActive && (
+                    <div style={styles.detailPanel}>
+                      <div style={styles.detailSectionTitle}>
+                        Alert seconds (avg &gt; max)
+                      </div>
+                      {getPerSecondAlerts().length === 0 ? (
+                        <div>No alert seconds.</div>
+                      ) : (
+                        getPerSecondAlerts().map((p, idx) => (
+                          <div key={`pa-${idx}`}>
+                            date = {p.date}, second = {p.second}, avg ={" "}
+                            {p.avg_count.toFixed(3)}
+                          </div>
+                        ))
+                      )}
+                      <div style={styles.detailSectionTitle}>
+                        Safe seconds (between min &amp; max)
+                      </div>
+                      {getPerSecondSafe().length === 0 ? (
+                        <div>No safe seconds for current thresholds.</div>
+                      ) : (
+                        getPerSecondSafe().map((p, idx) => (
+                          <div key={`ps-${idx}`}>
+                            date = {p.date}, second = {p.second}, avg ={" "}
+                            {p.avg_count.toFixed(3)}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+
+                {/* DAY-WISE GRAPH 3 – histogram */}
+                <div style={styles.graphBox}>
+                  <div style={styles.graphTitle}>
+                    Count distribution histogram (selected day)
+                  </div>
+                  <div style={styles.graphSubtitle}>
+                    Frequency of crowd counts in 10 bins. Reveals distribution
+                    patterns and outliers.
+                  </div>
+                  <button
+                    style={styles.detailBtn}
+                    onClick={() =>
+                      setShowDistributionDetails((prev) => !prev)
+                    }
+                  >
+                    {showDistributionDetails
+                      ? "Hide details"
+                      : "Show details"}
+                  </button>
+                  <div style={styles.graphArea}>
+                    {distributionData.length === 0 ? (
+                      <div style={styles.graphPlaceholder}>
+                        Upload a CSV and select a date to see count
+                        distribution.
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={distributionData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="range"
+                            tick={{
+                              fill: "#93c5fd",
+                              fontSize: 11,
+                            }}
+                            label={{
+                              value: "Count Range",
+                              position: "insideBottom",
+                              offset: -5,
+                              fill: "#6b7280",
+                              fontSize: 11,
+                            }}
+                          />
+                          <YAxis
+                            tick={{
+                              fill: "#93c5fd",
+                              fontSize: 11,
+                            }}
+                            label={{
+                              value: "Frequency",
+                              angle: -90,
+                              position: "insideLeft",
+                              fill: "#6b7280",
+                              fontSize: 11,
+                            }}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: "#020617",
+                              border: "1px solid #1e293b",
+                              borderRadius: "8px",
+                              fontSize: "11px",
+                            }}
+                            labelStyle={{ color: "#e5e7eb" }}
+                          />
+                          <Legend />
+                          <Bar
+                            dataKey="frequency"
+                            name="Occurrences"
+                            fill="#60a5fa"
+                          >
+                            {distributionData.map((entry, index) => {
+                              const v = entry.count;
+                              let fillColor = "#60a5fa";
+                              if (thresholdsActive) {
+                                if (v > parsedMax) fillColor = RED;
+                                else if (
+                                  v >= parsedMin &&
+                                  v <= parsedMax
+                                )
+                                  fillColor = GREEN;
+                                else fillColor = AMBER;
+                              }
+                              return (
+                                <Cell
+                                  key={`dist-${index}`}
+                                  fill={fillColor}
+                                />
+                              );
+                            })}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                  {showDistributionDetails && thresholdsActive && (
+                    <div style={styles.detailPanel}>
+                      <div style={styles.detailSectionTitle}>
+                        Alert bins (bin centre &gt; max)
+                      </div>
+                      {getDistributionAlerts().length === 0 ? (
+                        <div>No alert bins.</div>
+                      ) : (
+                        getDistributionAlerts().map((d, idx) => (
+                          <div key={`da-${idx}`}>
+                            range = {d.range}, freq = {d.frequency}, avg ={" "}
+                            {d.count.toFixed(1)}
+                          </div>
+                        ))
+                      )}
+
+                      <div style={styles.detailSectionTitle}>
+                        Safe bins (between min &amp; max)
+                      </div>
+                      {getDistributionSafe().length === 0 ? (
+                        <div>No safe bins for current thresholds.</div>
+                      ) : (
+                        getDistributionSafe().map((d, idx) => (
+                          <div key={`ds-${idx}`}>
+                            range = {d.range}, freq = {d.frequency}, avg ={" "}
+                            {d.count.toFixed(1)}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
