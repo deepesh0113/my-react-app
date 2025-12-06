@@ -1271,7 +1271,7 @@ a {
 }
 
 /* Integrations – chips with no border, just pill bg */
-
+/* 
 .integrations {
   margin-top: 10px;
   padding-top: 10px;
@@ -1303,7 +1303,7 @@ a {
   color: #bfdbfe;
   background-color: #020617;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.9);
-}
+} */
 
 /* ------------- RESPONSIVE ------------- */
 

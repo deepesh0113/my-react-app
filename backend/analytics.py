@@ -292,19 +292,46 @@ def process_video_to_csv(video_path: str, run_id: str, csv_path: str):
                 display_count = 0.00
 
             # ---------- Threshold-based email alert ----------
+            # thr_val = None
+            # with RUNS_LOCK:
+            #     if run_id in RUN_THRESHOLDS:
+            #         thr_val = RUN_THRESHOLDS[run_id]
+
+            # if thr_val is not None and display_count > thr_val:
+            #     with RUNS_LOCK:
+            #         already_sent = RUNS.get(run_id, {}).get("alert_sent", False)
+            #         if not already_sent:
+            #             print(f"[EMAIL] Threshold exceeded: {display_count:.2f} > {thr_val}")
+            #             send_email_alert(display_count, thr_val)
+            #             RUNS[run_id]["alert_sent"] = True
+            #             alert_field = (alert_field + "; " if alert_field else "") + "threshold_exceeded"
+
+                        # ---------- Threshold-based email alert + safe status ----------
             thr_val = None
             with RUNS_LOCK:
                 if run_id in RUN_THRESHOLDS:
                     thr_val = RUN_THRESHOLDS[run_id]
 
-            if thr_val is not None and display_count > thr_val:
-                with RUNS_LOCK:
-                    already_sent = RUNS.get(run_id, {}).get("alert_sent", False)
-                    if not already_sent:
-                        print(f"[EMAIL] Threshold exceeded: {display_count:.2f} > {thr_val}")
-                        send_email_alert(display_count, thr_val)
-                        RUNS[run_id]["alert_sent"] = True
-                        alert_field = (alert_field + "; " if alert_field else "") + "threshold_exceeded"
+            if thr_val is not None:
+                exceeds = display_count > thr_val
+
+                if exceeds:
+                    # 1) Always mark this frame as threshold_exceeded
+                    alert_field = (alert_field + "; " if alert_field else "") + "threshold_exceeded"
+
+                    # 2) Send email ONLY once per run_id
+                    with RUNS_LOCK:
+                        already_sent = RUNS.get(run_id, {}).get("alert_sent", False)
+                        if not already_sent:
+                            print(f"[EMAIL] Threshold exceeded: {display_count:.2f} > {thr_val}")
+                            send_email_alert(display_count, thr_val)
+                            RUNS[run_id]["alert_sent"] = True
+                else:
+                    # Below or equal threshold: if no other alert (e.g. hinder), mark as safe
+                    if not alert_field:
+                        alert_field = "SAFE"
+            # -------------------------------------------------
+
             # -------------------------------------------------
 
             row = [date_now, time_sec, f"{display_count:.3f}", alert_field]

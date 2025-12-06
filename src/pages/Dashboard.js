@@ -73,6 +73,7 @@ function Dashboard() {
   const [showTimeDetails, setShowTimeDetails] = useState(false);
   const [showPerSecondDetails, setShowPerSecondDetails] = useState(false);
   const [showDistributionDetails, setShowDistributionDetails] = useState(false);
+  const [showStatusDetails, setShowStatusDetails] = useState(false);
   const [showMonthDetails, setShowMonthDetails] = useState(false);
   const [showMonthDetails2, setShowMonthDetails2] = useState(false);
   const [showMonthDetails3, setShowMonthDetails3] = useState(false);
@@ -631,6 +632,63 @@ function Dashboard() {
       const perSecondAll = data.per_second || data.persecond || [];
       const rawSummary = data.summary || null;
 
+      // ---------- FORMATTER: seconds (number) -> "MM:SS.mmm" label ----------
+      const formatSecondsToLabel = (val) => {
+        if (val === null || val === undefined) return "";
+
+        // if already a nice string, keep it
+        if (typeof val === "string") {
+          const trimmed = val.trim();
+          const num = Number(trimmed);
+          // if it's a numeric-string, treat as seconds; else just return
+          if (!Number.isFinite(num)) return trimmed;
+          val = num;
+        }
+
+        const secNum = Number(val);
+        if (!Number.isFinite(secNum)) return String(val);
+
+        const totalMs = Math.round(secNum * 1000); // seconds -> ms
+        const minutes = Math.floor(totalMs / 60000);
+        const seconds = Math.floor((totalMs % 60000) / 1000);
+        const millis = totalMs % 1000;
+
+        const pad2 = (n) => n.toString().padStart(2, "0");
+        const pad3 = (n) => n.toString().padStart(3, "0");
+
+        // "MM:SS.mmm" e.g. "00:02.500"
+        return `${pad2(minutes)}:${pad2(seconds)}.${pad3(millis)}`;
+      };
+
+      // ---------- NORMALIZE RECORDS (day-wise points) ----------
+      const normalizedRecords = records.map((r) => {
+        // backend sends r.timestamp as seconds (number or numeric string)
+        const tsLabel = formatSecondsToLabel(r.timestamp);
+        return {
+          ...r,
+          // overwrite timestamp with a pretty string label for X-axis & details
+          timestamp: tsLabel,
+        };
+      });
+
+      // ---------- NORMALIZE PER-SECOND DATA (if backend returns it) ----------
+      const normalizedPerSecond = perSecondAll.map((p) => {
+        // try multiple possible keys just to be safe
+        const tsSource =
+          p.timestamp ??
+          p.second ??
+          p.time_sec ??
+          null;
+
+        const tsLabel = formatSecondsToLabel(tsSource);
+
+        return {
+          ...p,
+          timestamp: tsLabel,
+        };
+      });
+
+
       // Normalize summary to {min,max,mean,n}
       let normSummary = null;
       if (rawSummary) {
@@ -654,22 +712,25 @@ function Dashboard() {
       }
 
       // Store raw unfiltered
-      setRawGraphData(records);
-      setRawPerSecondData(perSecondAll);
+      setRawGraphData(normalizedRecords);
+      setRawPerSecondData(normalizedPerSecond);
+
 
       // Collect unique dates from records
       const uniqueDates = Array.from(
-        new Set(records.map((r) => r.date).filter(Boolean))
+        new Set(normalizedRecords.map((r) => r.date).filter(Boolean))
       );
+
       uniqueDates.sort();
       setAvailableDates(uniqueDates);
       const initialDate = uniqueDates[0] || "";
       setSelectedDate(initialDate);
 
+
       // Collect unique months from records (YYYY-MM)
       const uniqueMonths = Array.from(
         new Set(
-          records
+          normalizedRecords
             .map((r) => (r.date ? r.date.slice(0, 7) : null))
             .filter(Boolean)
         )
@@ -682,7 +743,7 @@ function Dashboard() {
       // Collect unique years
       const uniqueYears = Array.from(
         new Set(
-          records
+          normalizedRecords
             .map((r) => (r.date ? r.date.slice(0, 4) : null))
             .filter(Boolean)
         )
@@ -695,23 +756,24 @@ function Dashboard() {
       // Default to day view
       setViewMode("day");
 
+
       // Apply initial filters
-      applyDateFilter(initialDate, records, perSecondAll);
-      applyMonthFilter(initialMonth, records);
-      applyYearFilter(initialYear, records);
+      applyDateFilter(initialDate, normalizedRecords, normalizedPerSecond);
+      applyMonthFilter(initialMonth, normalizedRecords);
+      applyYearFilter(initialYear, normalizedRecords);
 
       setSummary(normSummary);
-
       // History entry
       const minVal = normSummary ? normSummary.min : null;
       const maxVal = normSummary ? normSummary.max : null;
       const newHistoryItem = {
         name: csvFile.name,
         uploadedAt: new Date().toLocaleString(),
-        points: records.length,
+        points: normalizedRecords.length,
         minCount: minVal,
         maxCount: maxVal,
       };
+
       setHistory((prev) => [newHistoryItem, ...prev]);
       setSelectedHistory(newHistoryItem);
     } catch (err) {
@@ -942,7 +1004,7 @@ function Dashboard() {
               <div style={styles.graphSubtitle}>
                 Expected format
                 <br />
-                <code>date,timestamp_ms,count,alert</code>
+                <code>date,timestamp,count,alert</code>
                 <br />
                 <br />
                 Legend additions:
@@ -1319,7 +1381,7 @@ function Dashboard() {
                   )}
                 </div>
 
-                {/* DAY-WISE GRAPH 2 – pi chart */} 
+                {/* DAY-WISE GRAPH 2 – pi chart */}
                 <div style={styles.graphBox}>
                   <div style={styles.graphTitle}>
                     Crowd status distribution (selected day)
@@ -1329,16 +1391,31 @@ function Dashboard() {
                     camera frozen.
                   </div>
 
-                  {/* small computed summary */}
+                  {/* Show / Hide details button */}
+                  <button
+                    style={styles.detailBtn}
+                    onClick={() => setShowStatusDetails((prev) => !prev)}
+                  >
+                    {showStatusDetails ? "Hide details" : "Show details"}
+                  </button>
+
+                  {/* small computed summary + pie */}
                   {graphData.length > 0 && (
                     <div style={styles.summaryRow}>
                       {(() => {
-                        let below = 0, safe = 0, above = 0, lens = 0, frozen = 0;
-                        graphData.forEach(p => {
+                        let below = 0,
+                          safe = 0,
+                          above = 0,
+                          lens = 0,
+                          frozen = 0;
+
+                        graphData.forEach((p) => {
                           const v = Number(p.count);
                           const a = (p.alert || "").trim();
+
                           if (a === "lens_covered_or_extremely_dark") lens++;
                           if (a === "camera_frozen") frozen++;
+
                           if (thresholdsActive && !Number.isNaN(v)) {
                             if (v > parsedMax) above++;
                             else if (v >= parsedMin && v <= parsedMax) safe++;
@@ -1353,22 +1430,19 @@ function Dashboard() {
                           { name: "Above max", value: above, color: RED },
                           { name: "Lens covered", value: lens, color: LENSALERT },
                           { name: "Camera frozen", value: frozen, color: FREEZEALERT },
-                        ].filter(d => d.value > 0);
+                        ].filter((d) => d.value > 0);
+
+                        const pct = (n) =>
+                          total > 0 ? ((n * 100) / total).toFixed(1) : "0.0";
 
                         return (
                           <>
                             <span style={styles.summaryChip}>Frames: {total}</span>
                             {thresholdsActive && (
                               <>
-                                <span style={styles.summaryChip}>
-                                  Safe: {safe}
-                                </span>
-                                <span style={styles.summaryChip}>
-                                  Above max: {above}
-                                </span>
-                                <span style={styles.summaryChip}>
-                                  Below min: {below}
-                                </span>
+                                <span style={styles.summaryChip}>Safe: {safe}</span>
+                                <span style={styles.summaryChip}>Above max: {above}</span>
+                                <span style={styles.summaryChip}>Below min: {below}</span>
                               </>
                             )}
                             <span style={styles.summaryChip}>
@@ -1391,9 +1465,10 @@ function Dashboard() {
                                         fontSize: 11,
                                       }}
                                       labelStyle={{ color: "#e5e7eb" }}
-                                      formatter={(value, name) =>
-                                        [`${value} frames`, name]
-                                      }
+                                      formatter={(value, name) => [
+                                        `${value} frames`,
+                                        name,
+                                      ]}
                                     />
                                     <Legend />
                                     <Pie
@@ -1417,6 +1492,45 @@ function Dashboard() {
                                 </ResponsiveContainer>
                               )}
                             </div>
+
+                            {/* DETAIL PANEL */}
+                            {showStatusDetails && (
+                              <div style={styles.detailPanel}>
+                                <div style={styles.detailSectionTitle}>
+                                  Overall breakdown
+                                </div>
+                                <div>Total frames: {total}</div>
+                                <div>
+                                  Lens covered: {lens} ({pct(lens)}%)
+                                </div>
+                                <div>
+                                  Camera frozen: {frozen} ({pct(frozen)}%)
+                                </div>
+
+                                {thresholdsActive ? (
+                                  <>
+                                    <div style={styles.detailSectionTitle}>
+                                      Threshold-based categories
+                                    </div>
+                                    <div>
+                                      Below min: {below} ({pct(below)}%)
+                                    </div>
+                                    <div>
+                                      Safe (between min &amp; max): {safe} (
+                                      {pct(safe)}%)
+                                    </div>
+                                    <div>
+                                      Above max: {above} ({pct(above)}%)
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div style={{ marginTop: 4 }}>
+                                    Thresholds are not set. Only lens/frozen counts
+                                    are meaningful.
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </>
                         );
                       })()}
@@ -1431,10 +1545,6 @@ function Dashboard() {
                     </div>
                   )}
                 </div>
-
-
-
-
                 {/* DAY-WISE GRAPH 3 – histogram */}
                 <div style={styles.graphBox}>
                   <div style={styles.graphTitle}>

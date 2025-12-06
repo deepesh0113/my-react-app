@@ -282,6 +282,7 @@ function MainPage({ user }) {
       marginTop: 4,
       marginBottom: 10,
       fontSize: 13,
+      backgroundColor: "#111827",
     },
   };
 
@@ -316,11 +317,11 @@ function MainPage({ user }) {
       pairs.map((pair) =>
         pair.pairId === pairId
           ? {
-              ...pair,
-              cameras: pair.cameras.map((cam) =>
-                cam.id === cameraId ? { ...cam, on: !cam.on } : cam
-              ),
-            }
+            ...pair,
+            cameras: pair.cameras.map((cam) =>
+              cam.id === cameraId ? { ...cam, on: !cam.on } : cam
+            ),
+          }
           : pair
       )
     );
@@ -331,11 +332,11 @@ function MainPage({ user }) {
       pairs.map((pair) =>
         pair.pairId === pairId
           ? {
-              ...pair,
-              cameras: pair.cameras.map((cam) =>
-                cam.id === cameraId ? { ...cam, name: newName } : cam
-              ),
-            }
+            ...pair,
+            cameras: pair.cameras.map((cam) =>
+              cam.id === cameraId ? { ...cam, name: newName } : cam
+            ),
+          }
           : pair
       )
     );
@@ -348,58 +349,58 @@ function MainPage({ user }) {
       pairs.map((pair) =>
         pair.pairId === pairId
           ? {
-              ...pair,
-              cameras: pair.cameras.map((cam) =>
-                cam.id === cameraId
-                  ? { ...cam, src: URL.createObjectURL(file), uploadedFile: file }
-                  : cam
-              ),
-            }
+            ...pair,
+            cameras: pair.cameras.map((cam) =>
+              cam.id === cameraId
+                ? { ...cam, src: URL.createObjectURL(file), uploadedFile: file }
+                : cam
+            ),
+          }
           : pair
       )
     );
   };
 
   const startAnalysis = async (pairId, cameraId) => {
-  const targetPair = cameraPairs.find((p) => p.pairId === pairId);
-  const cam = targetPair.cameras.find((c) => c.id === cameraId);
+    const targetPair = cameraPairs.find((p) => p.pairId === pairId);
+    const cam = targetPair.cameras.find((c) => c.id === cameraId);
 
-  if (!cam.uploadedFile) {
-    alert("Upload a video before starting analysis.");
-    return;
-  }
-  if (!threshold) {
-    alert("Please enter threshold before analysis.");
-    return;
-  }
-
-  setAnalysisStarted(true);
-
-  const formData = new FormData();
-  formData.append("video", cam.uploadedFile);
-  formData.append("threshold", threshold);   // ⭐ IMPORTANT
-
-  try {
-    const res = await fetch(`${API_BASE}/analytics/process_video/`, {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await res.json();
-    if (!data.run_id) {
-      console.error("No run_id in response", data);
-      setAnalysisStarted(false);
+    if (!cam.uploadedFile) {
+      alert("Upload a video before starting analysis.");
+      return;
+    }
+    if (!threshold) {
+      alert("Please enter threshold before analysis.");
       return;
     }
 
-    const runId = data.run_id;
-    pollResults(pairId, runId);
-  } catch (err) {
-    console.error("Error during analysis:", err);
-  }
+    setAnalysisStarted(true);
 
-  setAnalysisStarted(false);
-};
+    const formData = new FormData();
+    formData.append("video", cam.uploadedFile);
+    formData.append("threshold", threshold);   
+
+    try {
+      const res = await fetch(`${API_BASE}/analytics/process_video/`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!data.run_id) {
+        console.error("No run_id in response", data);
+        setAnalysisStarted(false);
+        return;
+      }
+
+      const runId = data.run_id;
+      pollResults(pairId, runId);
+    } catch (err) {
+      console.error("Error during analysis:", err);
+    }
+
+    setAnalysisStarted(false);
+  };
 
 
   const pollResults = (pairId, runId) => {
@@ -605,25 +606,25 @@ function MainPage({ user }) {
                             }}
                           >
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-  <div style={styles.csvTitle}>Crowd CSV (live)</div>
+                              <div style={styles.csvTitle}>Crowd CSV (live)</div>
 
-  <button
-    onClick={() => downloadCsvForPair(pair.pairId, cam.name)}
-    style={{
-      backgroundColor: "#0ea5e9",
-      color: "#0b1120",
-      border: "none",
-      borderRadius: "8px",
-      padding: "4px 10px",
-      fontSize: "12px",
-      fontWeight: "600",
-      marginLeft: "400px", 
-      cursor: "pointer",
-    }}
-  >
-    Download CSV
-  </button>
-</div>
+                              {/* <button
+                                onClick={() => downloadCsvForPair(pair.pairId, cam.name)}
+                                style={{
+                                  backgroundColor: "#0ea5e9",
+                                  color: "#0b1120",
+                                  border: "none",
+                                  borderRadius: "8px",
+                                  padding: "4px 10px",
+                                  fontSize: "12px",
+                                  fontWeight: "600",
+                                  marginLeft: "400px",
+                                  cursor: "pointer",
+                                }}
+                              > 
+                                Download CSV
+                              </button> */}
+                            </div>
 
                           </div>
 
